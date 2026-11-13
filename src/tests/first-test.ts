@@ -9,18 +9,40 @@ const orderProcessingTime = new Trend('order_processing_time');
 export const options = {
     thresholds: {
         http_req_duration: ['p(95)<500'],
-        checks: ['rate>0.95'],
-        http_req_failed: ['rate<0.01']
+        successful_orders: ['count>90'],
+        order_success_rate: ['rate>0.95'],
+        order_processing_time: ['p(95)<400']
     }
 };
 
 export default function () {
-    const response = http.get('https://jsonplaceholder.typicode.com/users/1');
-    
-    check(response, {
-        'status is 200': (res) => res.status === 200,
-        'response time below 500ms': (res) => res.timings.duration < 500,
-        'response body contains name': (res) => typeof res.body === 'string' && res.body.includes('Leanne Graham'),
-        'response body contains email': (res) => typeof res.body === 'string' && res.body.includes('Sincere@april.biz')
+    const url = 'https://test-api.example.com/orders';
+
+    const payload = JSON.stringify({
+        productId: 123,
+        quantity: 2
     });
+
+    const params = {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const response = http.post(url, payload, params);
+
+    // 1. Verwerkingstijd registreren
+    const processingTime = response.timings.duration;
+    orderProcessingTime.add(processingTime);
+
+    // 2. Bepalen of de bestelling succesvol is
+    const isSuccessful = response.status === 201;
+
+    // 3. Alleen succesvolle bestellingen optellen
+    if (isSuccessful) {
+        successfulOrders.add(1);
+    }
+
+    // 4. Resultaat registreren voor de Rate
+    orderSuccessRate.add(isSuccessful);
 }
